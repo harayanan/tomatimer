@@ -207,7 +207,7 @@ struct PopoverView: View {
             }
             HStack {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Click the menu bar timer to pause.")
+                    Text("Click the menu bar timer to start or pause.")
                     Text("Right-click it to open this panel.")
                 }
                 .font(.system(size: 10.5))

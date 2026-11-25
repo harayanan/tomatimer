@@ -3,8 +3,7 @@ import SwiftUI
 import Combine
 
 /// Owns the menu bar item (pie glyph + countdown) and its popover.
-/// Left-click pauses/resumes a running timer; right-click or ⌥-click opens the panel.
-/// When nothing is running, a left-click opens the panel.
+/// Left-click starts, pauses or resumes the timer; right-click or ⌥-click opens the panel.
 @MainActor
 final class StatusItemController: NSObject {
     private let engine: TimerEngine
@@ -73,7 +72,7 @@ final class StatusItemController: NSObject {
         let wantsPanel = event?.type == .rightMouseUp
             || event?.modifierFlags.contains(.option) == true
             || event?.modifierFlags.contains(.control) == true
-        if wantsPanel || engine.state == .idle {
+        if wantsPanel {
             showPopover()
         } else {
             engine.toggle()
@@ -138,7 +137,7 @@ final class StatusItemController: NSObject {
 
         let intention = engine.intention.trimmingCharacters(in: .whitespaces)
         var tip = intention.isEmpty ? "Tomatimer" : "Working on: \(intention)"
-        if engine.state != .idle { tip += "\nClick to \(engine.state == .running ? "pause" : "resume") · Right-click for options" }
+        tip += "\nClick to \(engine.state == .running ? "pause" : (engine.state == .paused ? "resume" : "start")) · Right-click for options"
         button.toolTip = tip
     }
 }
