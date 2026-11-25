@@ -99,10 +99,10 @@ final class StatusItemController: NSObject {
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 110_000_000)
             guard let self, !self.attention else { return }
-            NSAnimationContext.runAnimationGroup { ctx in
+            NSAnimationContext.runAnimationGroup({ ctx in
                 ctx.duration = 0.18
                 self.item.button?.animator().alphaValue = 1
-            }
+            }, completionHandler: nil)
         }
     }
 
