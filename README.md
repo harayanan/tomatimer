@@ -16,8 +16,9 @@ Manual install: download `Tomatimer.zip` from [Releases](https://github.com/hara
 
 ## What it does
 
-- **Menu bar:** a coloured ring and countdown. Red = focus, green = break, blue = long break, grey = paused.
-- **Click the ring:** large timer, a "What are you working on?" field, start/pause, skip, reset, today's sessions and settings.
+- **Menu bar:** a pie that empties as time runs down, plus the countdown. Red = focus, green = break, blue = long break. Paused shows pause bars; idle shows a small tomato outline.
+- **Left-click** the menu bar item to start, pause or resume. **Right-click** (or ⌥-click) opens the panel.
+- **Panel:** a large dial with minute ticks (click it to pause/resume), the end time, a "What are you working on?" field, reset/skip, today's sessions and settings.
 - **End of each phase:** a full-screen overlay on every display with a chime. Return = primary action, Esc = secondary.
 - **Away detection:** no keyboard/mouse input for 3+ minutes during focus (or the Mac slept). On your return you get a card with what you were working on and the time left.
 - **Drift reminder:** once a session has started, if no timer runs for 5 minutes, the ring pulses amber and a reminder card appears every 5 minutes until you start a timer or choose "Done for today".
