@@ -48,13 +48,49 @@ struct PillButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: large ? 17 : 13, weight: .semibold, design: .rounded))
             .foregroundStyle(prominent ? Color.white : Color.primary)
-            .padding(.horizontal, large ? 28 : 18)
-            .padding(.vertical, large ? 12 : 7)
+            .padding(.horizontal, large ? 30 : 22)
+            .padding(.vertical, large ? 13 : 9)
             .background(
-                Capsule().fill(prominent ? tint : Color.primary.opacity(0.10))
+                ZStack {
+                    if prominent {
+                        Capsule().fill(LinearGradient(
+                            colors: [tint.opacity(0.80), tint],
+                            startPoint: .top, endPoint: .bottom
+                        ))
+                        Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.5)
+                    } else {
+                        Capsule().fill(Color.primary.opacity(0.09))
+                    }
+                }
             )
-            .opacity(configuration.isPressed ? 0.75 : 1)
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .shadow(color: prominent ? tint.opacity(0.35) : Color.clear, radius: 6, x: 0, y: 3)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
             .contentShape(Capsule())
+    }
+}
+
+/// Round icon button used beside the primary pill.
+struct CircleIconButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        CircleIconBody(configuration: configuration)
+    }
+
+    private struct CircleIconBody: View {
+        let configuration: ButtonStyleConfiguration
+        @State private var hovering = false
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.primary.opacity(0.75))
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Color.primary.opacity(configuration.isPressed ? 0.16 : (hovering ? 0.11 : 0.07))))
+                .scaleEffect(configuration.isPressed ? 0.93 : 1)
+                .animation(.spring(response: 0.25, dampingFraction: 0.7), value: configuration.isPressed)
+                .onHover { hovering = $0 }
+                .contentShape(Circle())
+        }
     }
 }

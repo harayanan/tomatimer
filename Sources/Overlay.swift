@@ -129,7 +129,7 @@ final class OverlayController {
 
 // MARK: - Views
 
-private struct FullscreenBackdrop: View {
+struct FullscreenBackdrop: View {
     let prompt: Prompt?
 
     var body: some View {
@@ -146,7 +146,7 @@ private struct FullscreenBackdrop: View {
     }
 }
 
-private struct CardView: View {
+struct CardView: View {
     let prompt: Prompt
 
     var body: some View {
@@ -163,21 +163,35 @@ private struct CardView: View {
     }
 }
 
-private struct PromptBody: View {
+struct PromptBody: View {
     let prompt: Prompt
     let large: Bool
+    /// Off for snapshots, so views render in their final state.
+    static var animate = true
+    @State private var appeared = !PromptBody.animate
+    @State private var pulse = false
+
+    private var badge: CGFloat { large ? 92 : 58 }
 
     var body: some View {
         VStack(spacing: large ? 18 : 12) {
             ZStack {
                 Circle()
-                    .fill(prompt.tint.opacity(0.22))
-                    .frame(width: large ? 88 : 56, height: large ? 88 : 56)
+                    .stroke(prompt.tint.opacity(0.5), lineWidth: 2)
+                    .frame(width: badge, height: badge)
+                    .scaleEffect(pulse ? 1.45 : 1)
+                    .opacity(pulse ? 0 : 0.9)
+                Circle()
+                    .fill(RadialGradient(
+                        colors: [prompt.tint.opacity(0.38), prompt.tint.opacity(0.16)],
+                        center: .center, startRadius: 0, endRadius: badge / 2
+                    ))
+                    .frame(width: badge, height: badge)
                 Image(systemName: prompt.symbol)
-                    .font(.system(size: large ? 36 : 22, weight: .semibold))
+                    .font(.system(size: large ? 38 : 22, weight: .semibold))
                     .foregroundStyle(prompt.tint)
             }
-            .padding(.bottom, large ? 6 : 2)
+            .frame(width: badge * 1.5, height: badge * 1.3)
 
             Text(prompt.eyebrow.uppercased())
                 .font(.system(size: large ? 13 : 11, weight: .semibold, design: .rounded))
@@ -185,7 +199,7 @@ private struct PromptBody: View {
                 .foregroundStyle(prompt.tint)
 
             Text(prompt.title)
-                .font(.system(size: large ? 46 : 24, weight: .semibold, design: .rounded))
+                .font(.system(size: large ? 52 : 25, weight: .bold, design: .rounded))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Color.white)
 
@@ -230,5 +244,13 @@ private struct PromptBody: View {
             }
         }
         .environment(\.colorScheme, .dark)
+        .scaleEffect(appeared ? 1 : 0.94)
+        .opacity(appeared ? 1 : 0)
+        .offset(y: appeared ? 0 : 12)
+        .onAppear {
+            guard Self.animate else { return }
+            withAnimation(.spring(response: 0.55, dampingFraction: 0.82)) { appeared = true }
+            withAnimation(.easeOut(duration: 1.8).repeatForever(autoreverses: false).delay(0.4)) { pulse = true }
+        }
     }
 }

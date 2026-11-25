@@ -7,6 +7,12 @@ enum TomatimerMain {
     @MainActor
     static func main() {
         let app = NSApplication.shared
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--snapshot") {
+            app.setActivationPolicy(.prohibited)
+            Snapshot.run(outDir: i + 1 < args.count ? args[i + 1] : "snapshots")
+            exit(0)
+        }
         let delegate = AppDelegate()
         app.delegate = delegate
         app.setActivationPolicy(.accessory)

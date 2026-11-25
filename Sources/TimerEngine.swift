@@ -54,6 +54,22 @@ final class TimerEngine: NSObject, ObservableObject {
 
     var timeString: String { Self.format(remaining) }
 
+    /// Wall-clock time the running phase ends.
+    var endsAt: Date? { endDate }
+
+    /// Snapshot/testing hook: put the engine into an arbitrary visible state.
+    func debugSet(phase: Phase, state: RunState, fraction: Double, cycle: Int, today: Int) {
+        stopTicking()
+        self.phase = phase
+        currentDuration = settings.duration(for: phase)
+        remaining = currentDuration * fraction
+        self.state = state
+        cyclePosition = cycle
+        completedToday = today
+        sessionActive = state != .idle
+        endDate = state == .running ? Date().addingTimeInterval(remaining) : nil
+    }
+
     static func format(_ t: TimeInterval) -> String {
         let s = max(0, Int(t.rounded(.up)))
         return String(format: "%d:%02d", s / 60, s % 60)

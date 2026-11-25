@@ -2,7 +2,9 @@ import AppKit
 import SwiftUI
 import Combine
 
-/// Owns the menu bar item (ring + countdown) and its popover.
+/// Owns the menu bar item (pie glyph + countdown) and its popover.
+/// Left-click pauses/resumes a running timer; right-click or ⌥-click opens the panel.
+/// When nothing is running, a left-click opens the panel.
 @MainActor
 final class StatusItemController: NSObject {
     private let engine: TimerEngine
@@ -20,7 +22,7 @@ final class StatusItemController: NSObject {
 
         if let button = item.button {
             button.target = self
-            button.action = #selector(togglePopover)
+            button.action = #selector(handleClick)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.imagePosition = .imageLeading
         }
@@ -39,7 +41,7 @@ final class StatusItemController: NSObject {
         refresh()
     }
 
-    /// Pulse the item and tint it amber while the user has drifted off.
+    /// Pulse the item amber while the user has drifted off.
     func setAttention(_ on: Bool) {
         guard on != attention else { return }
         attention = on
@@ -47,7 +49,7 @@ final class StatusItemController: NSObject {
         pulseTimer = nil
         item.button?.alphaValue = 1
         if on {
-            let t = Timer(timeInterval: 0.7, target: self, selector: #selector(pulse), userInfo: nil, repeats: true)
+            let t = Timer(timeInterval: 0.8, target: self, selector: #selector(pulse), userInfo: nil, repeats: true)
             t.tolerance = 0.1
             RunLoop.main.add(t, forMode: .common)
             pulseTimer = t
@@ -60,95 +62,189 @@ final class StatusItemController: NSObject {
         popover.performClose(nil)
     }
 
-    @objc private func pulse() {
-        pulseDim.toggle()
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.6
-            item.button?.animator().alphaValue = pulseDim ? 0.3 : 1
+    // MARK: Clicks
+
+    @objc private func handleClick() {
+        if popover.isShown {
+            popover.performClose(nil)
+            return
+        }
+        let event = NSApp.currentEvent
+        let wantsPanel = event?.type == .rightMouseUp
+            || event?.modifierFlags.contains(.option) == true
+            || event?.modifierFlags.contains(.control) == true
+        if wantsPanel || engine.state == .idle {
+            showPopover()
+        } else {
+            engine.toggle()
+            bump()
         }
     }
 
-    @objc private func togglePopover() {
+    private func showPopover() {
         guard let button = item.button else { return }
-        if popover.isShown {
-            popover.performClose(nil)
-        } else {
-            engine.refreshDay()
-            activateApp()
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+        engine.refreshDay()
+        activateApp()
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
+    }
+
+    /// Brief dip so a click-to-pause gets visible feedback.
+    private func bump() {
+        guard let button = item.button, !attention else { return }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.08
+            button.animator().alphaValue = 0.45
+        }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 110_000_000)
+            guard let self, !self.attention else { return }
+            NSAnimationContext.runAnimationGroup { ctx in
+                ctx.duration = 0.18
+                self.item.button?.animator().alphaValue = 1
+            }
         }
     }
+
+    @objc private func pulse() {
+        pulseDim.toggle()
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.7
+            item.button?.animator().alphaValue = pulseDim ? 0.35 : 1
+        }
+    }
+
+    // MARK: Rendering
 
     private func refresh() {
         guard let button = item.button else { return }
 
         let showTime = engine.state != .idle
         let text = showTime ? engine.timeString : ""
-        // Quantise the ring so the image is only redrawn when it visibly changes.
-        let steps = Int((engine.fractionRemaining * 48).rounded())
-        let signature = "\(engine.phase)|\(engine.state)|\(text)|\(steps)|\(attention)"
+        let fraction = engine.fractionRemaining
+        let signature = "\(engine.phase)|\(engine.state)|\(text)|\(Int(fraction * 400))|\(attention)"
         guard signature != lastSignature else { return }
         lastSignature = signature
 
-        let color: NSColor
-        switch engine.state {
-        case .running: color = Theme.nsColor(for: engine.phase)
-        case .paused: color = .secondaryLabelColor
-        case .idle: color = attention ? Theme.attention : .labelColor
-        }
-
-        let image: NSImage
-        if engine.state == .idle && !attention {
-            image = Self.ringImage(fraction: 1, color: .black, trackAlpha: 1)
-            image.isTemplate = true
-        } else {
-            let fraction = engine.state == .idle ? 1 : Double(steps) / 48
-            image = Self.ringImage(fraction: fraction, color: color, trackAlpha: 0.28)
-        }
-        button.image = image
+        button.image = MenuBarGlyph.image(
+            state: engine.state, phase: engine.phase, fraction: fraction, attention: attention
+        )
 
         if text.isEmpty {
             button.attributedTitle = NSAttributedString(string: "")
         } else {
-            let font = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium)
-            button.attributedTitle = NSAttributedString(string: " " + text, attributes: [
-                .font: font,
-                .foregroundColor: engine.state == .paused ? NSColor.secondaryLabelColor : NSColor.labelColor,
-                .baselineOffset: 0.5,
-            ])
+            button.attributedTitle = MenuBarGlyph.title(text, paused: engine.state == .paused)
         }
 
         let intention = engine.intention.trimmingCharacters(in: .whitespaces)
-        button.toolTip = intention.isEmpty ? "Tomatimer" : "Working on: \(intention)"
+        var tip = intention.isEmpty ? "Tomatimer" : "Working on: \(intention)"
+        if engine.state != .idle { tip += "\nClick to \(engine.state == .running ? "pause" : "resume") · Right-click for options" }
+        button.toolTip = tip
+    }
+}
+
+/// Menu bar artwork. 16 pt square glyphs, drawn at display resolution.
+enum MenuBarGlyph {
+    static let side: CGFloat = 16
+
+    static func image(state: RunState, phase: Phase, fraction: Double, attention: Bool) -> NSImage {
+        if attention && state != .running {
+            return pie(fraction: 1, color: Theme.attention)
+        }
+        switch state {
+        case .running: return pie(fraction: fraction, color: Theme.nsColor(for: phase))
+        case .paused: return paused(fraction: fraction)
+        case .idle: return idle()
+        }
     }
 
-    /// 16 pt ring: faint track plus an arc for the time left, starting at 12 o'clock.
-    static func ringImage(fraction: Double, color: NSColor, trackAlpha: CGFloat) -> NSImage {
-        NSImage(size: NSSize(width: 16, height: 16), flipped: false) { rect in
-            let lineWidth: CGFloat = 2.2
-            let inset = rect.insetBy(dx: 1.8, dy: 1.8)
-            let track = NSBezierPath(ovalIn: inset)
-            track.lineWidth = lineWidth
-            color.withAlphaComponent(trackAlpha).setStroke()
-            track.stroke()
+    static func title(_ text: String, paused: Bool) -> NSAttributedString {
+        NSAttributedString(string: " " + text, attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
+            .foregroundColor: paused ? NSColor.secondaryLabelColor : NSColor.labelColor,
+            .baselineOffset: 0.5,
+        ])
+    }
 
-            if fraction > 0.001 && trackAlpha < 1 {
-                let arc = NSBezierPath()
-                arc.appendArc(
-                    withCenter: NSPoint(x: rect.midX, y: rect.midY),
-                    radius: inset.width / 2,
-                    startAngle: 90,
-                    endAngle: 90 - 360 * CGFloat(fraction),
-                    clockwise: true
-                )
-                arc.lineWidth = lineWidth
-                arc.lineCapStyle = .round
-                color.setStroke()
-                arc.stroke()
+    /// Outer ring + shrinking wedge (12 o'clock, clockwise) for the time left.
+    static func pie(fraction: Double, color: NSColor) -> NSImage {
+        NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            let c = NSPoint(x: rect.midX, y: rect.midY)
+            let ring = NSBezierPath(ovalIn: circleRect(c, 6.9))
+            ring.lineWidth = 1.5
+            color.setStroke()
+            ring.stroke()
+
+            color.withAlphaComponent(0.2).setFill()
+            NSBezierPath(ovalIn: circleRect(c, 4.9)).fill()
+
+            color.setFill()
+            wedge(c, radius: 4.9, fraction: fraction)?.fill()
+            return true
+        }
+    }
+
+    /// Template: ring, faint remaining wedge, pause bars.
+    static func paused(fraction: Double) -> NSImage {
+        let img = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            let c = NSPoint(x: rect.midX, y: rect.midY)
+            let ring = NSBezierPath(ovalIn: circleRect(c, 6.9))
+            ring.lineWidth = 1.5
+            NSColor.black.setStroke()
+            ring.stroke()
+
+            NSColor.black.withAlphaComponent(0.22).setFill()
+            wedge(c, radius: 4.9, fraction: fraction)?.fill()
+
+            NSColor.black.setFill()
+            for dx in [-1.75, 1.75] as [CGFloat] {
+                NSBezierPath(roundedRect: NSRect(x: c.x + dx - 0.8, y: c.y - 2.75, width: 1.6, height: 5.5),
+                             xRadius: 0.8, yRadius: 0.8).fill()
             }
             return true
         }
+        img.isTemplate = true
+        return img
+    }
+
+    /// Template: small tomato outline (ring + calyx).
+    static func idle() -> NSImage {
+        let img = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            let c = NSPoint(x: rect.midX, y: rect.midY - 0.8)
+            let body = NSBezierPath(ovalIn: circleRect(c, 6.2))
+            body.lineWidth = 1.5
+            NSColor.black.setStroke()
+            body.stroke()
+
+            NSColor.black.setFill()
+            let top = c.y + 6.2
+            for (dx, angle) in [(-2.0, 24.0), (2.0, -24.0)] as [(CGFloat, CGFloat)] {
+                var t = AffineTransform(translationByX: c.x + dx, byY: top + 0.2)
+                t.rotate(byDegrees: angle)
+                let leaf = NSBezierPath(ovalIn: NSRect(x: -2.4, y: -0.95, width: 4.8, height: 1.9))
+                leaf.transform(using: t)
+                leaf.fill()
+            }
+            NSBezierPath(roundedRect: NSRect(x: c.x - 0.6, y: top - 0.4, width: 1.2, height: 2.6),
+                         xRadius: 0.6, yRadius: 0.6).fill()
+            return true
+        }
+        img.isTemplate = true
+        return img
+    }
+
+    private static func circleRect(_ c: NSPoint, _ r: CGFloat) -> NSRect {
+        NSRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
+    }
+
+    private static func wedge(_ c: NSPoint, radius: CGFloat, fraction: Double) -> NSBezierPath? {
+        guard fraction > 0.002 else { return nil }
+        if fraction >= 0.998 { return NSBezierPath(ovalIn: circleRect(c, radius)) }
+        let p = NSBezierPath()
+        p.move(to: c)
+        p.appendArc(withCenter: c, radius: radius, startAngle: 90, endAngle: 90 - 360 * CGFloat(fraction), clockwise: true)
+        p.close()
+        return p
     }
 }
 

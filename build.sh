@@ -23,8 +23,12 @@ lipo -create build/obj/Tomatimer-arm64 build/obj/Tomatimer-x86_64 -output "$APP/
 sed "s/__VERSION__/$VERSION/g" Info.plist > "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-echo "→ drawing icon"
-swift scripts/make-icon.swift build/AppIcon.iconset
+echo "→ icon"
+mkdir -p build/AppIcon.iconset
+for SZ in 16 32 128 256 512; do
+  sips -z $SZ $SZ Resources/AppIcon-1024.png --out "build/AppIcon.iconset/icon_${SZ}x${SZ}.png" >/dev/null
+  sips -z $((SZ*2)) $((SZ*2)) Resources/AppIcon-1024.png --out "build/AppIcon.iconset/icon_${SZ}x${SZ}@2x.png" >/dev/null
+done
 iconutil -c icns build/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
 
 echo "→ signing (ad-hoc)"
