@@ -210,23 +210,24 @@ enum MenuBarGlyph {
     /// Template: small tomato outline (ring + calyx).
     static func idle() -> NSImage {
         let img = NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
-            let c = NSPoint(x: rect.midX, y: rect.midY - 0.8)
-            let body = NSBezierPath(ovalIn: circleRect(c, 6.2))
+            let c = NSPoint(x: rect.midX, y: rect.midY - 1.2)
+            let r: CGFloat = 6.0
+            let body = NSBezierPath(ovalIn: circleRect(c, r))
             body.lineWidth = 1.5
             NSColor.black.setStroke()
             body.stroke()
 
             NSColor.black.setFill()
-            let top = c.y + 6.2
-            for (dx, angle) in [(-2.0, 24.0), (2.0, -24.0)] as [(CGFloat, CGFloat)] {
-                var t = AffineTransform(translationByX: c.x + dx, byY: top + 0.2)
+            let top = c.y + r
+            for (dx, angle) in [(-2.5, 26.0), (2.5, -26.0)] as [(CGFloat, CGFloat)] {
+                var t = AffineTransform(translationByX: c.x + dx, byY: top + 0.3)
                 t.rotate(byDegrees: angle)
-                let leaf = NSBezierPath(ovalIn: NSRect(x: -2.4, y: -0.95, width: 4.8, height: 1.9))
+                let leaf = NSBezierPath(ovalIn: NSRect(x: -2.9, y: -1.2, width: 5.8, height: 2.4))
                 leaf.transform(using: t)
                 leaf.fill()
             }
-            NSBezierPath(roundedRect: NSRect(x: c.x - 0.6, y: top - 0.4, width: 1.2, height: 2.6),
-                         xRadius: 0.6, yRadius: 0.6).fill()
+            NSBezierPath(roundedRect: NSRect(x: c.x - 0.7, y: top - 0.2, width: 1.4, height: 3.2),
+                         xRadius: 0.7, yRadius: 0.7).fill()
             return true
         }
         img.isTemplate = true

@@ -131,14 +131,29 @@ final class OverlayController {
 
 struct FullscreenBackdrop: View {
     let prompt: Prompt?
+    var showsBlur = true
 
     var body: some View {
         ZStack {
-            VisualEffect(material: .fullScreenUI)
-            Color.black.opacity(0.35)
+            if showsBlur {
+                VisualEffect(material: .fullScreenUI)
+                Color.black.opacity(0.35)
+            }
             if let prompt {
+                // Faint dial motif behind the prompt
+                ZStack {
+                    Circle().stroke(prompt.tint.opacity(0.10), lineWidth: 26)
+                    ForEach(0..<60, id: \.self) { i in
+                        Capsule()
+                            .fill(Color.white.opacity(i % 5 == 0 ? 0.10 : 0.05))
+                            .frame(width: i % 5 == 0 ? 3 : 2, height: i % 5 == 0 ? 16 : 9)
+                            .offset(y: -300)
+                            .rotationEffect(.degrees(Double(i) * 6))
+                    }
+                }
+                .frame(width: 680, height: 680)
                 PromptBody(prompt: prompt, large: true)
-                    .frame(maxWidth: 640)
+                    .frame(maxWidth: 560)
                     .padding(40)
             }
         }

@@ -206,10 +206,12 @@ struct PopoverView: View {
                 ))
             }
             HStack {
-                Text("Click the menu bar timer to pause · right-click for this panel")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(Color.secondary.opacity(0.8))
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Click the menu bar timer to pause.")
+                    Text("Right-click it to open this panel.")
+                }
+                .font(.system(size: 10.5))
+                .foregroundStyle(Color.secondary.opacity(0.8))
                 Spacer(minLength: 8)
                 Button("Quit", action: onQuit)
                     .buttonStyle(.plain)
@@ -287,7 +289,7 @@ struct DialView: View {
                     .trim(from: 0, to: fraction)
                     .stroke(
                         AngularGradient(
-                            gradient: Gradient(colors: [tint.opacity(0.55), tint]),
+                            gradient: Gradient(colors: fraction >= 0.999 ? [tint, tint] : [tint.opacity(0.55), tint]),
                             center: .center,
                             startAngle: .degrees(0),
                             endAngle: .degrees(360 * max(fraction, 0.01))

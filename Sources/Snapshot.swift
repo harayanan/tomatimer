@@ -63,7 +63,7 @@ enum Snapshot {
             let view = ZStack {
                 LinearGradient(colors: [Color(red: 0.16, green: 0.13, blue: 0.20), Color(red: 0.07, green: 0.07, blue: 0.10)],
                                startPoint: .top, endPoint: .bottom)
-                PromptBody(prompt: prompt, large: true).frame(maxWidth: 640)
+                FullscreenBackdrop(prompt: prompt, showsBlur: false)
             }
             .frame(width: 1440, height: 900)
             render(view, appearance: .darkAqua, name: name, out: out)
